@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -31,7 +31,7 @@ function formatValue(value, digits = 2) {
   return num.toFixed(digits);
 }
 
-export default function HistoryPage() {
+function HistoryPageContent() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -245,5 +245,13 @@ export default function HistoryPage() {
         ) : null}
       </main>
     </>
+  );
+}
+
+export default function HistoryPage() {
+  return (
+    <Suspense fallback={<main className="flex-1 w-full md:ml-64 min-h-screen p-8 mb-16 md:mb-0" />}>
+      <HistoryPageContent />
+    </Suspense>
   );
 }
