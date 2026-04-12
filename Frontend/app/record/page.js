@@ -1,20 +1,106 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 
 const DEFAULT_RECORDING_SECONDS = 15;
 const ASTHMA_RECORDING_SECONDS = 20;
+
+function parseExtractedMedicalReport(rawText) {
+  const text = String(rawText || '');
+  if (!text.trim()) {
+    return {
+      patientName: null,
+      disease: null,
+      rows: [],
+      firstScore: null,
+      lastScore: null,
+      scoreDelta: null,
+      finalScore: null,
+      finalStatus: null,
+    };
+  }
+
+  const patientNameMatch = text.match(/name\s*:\s*([^\n]+)/i);
+  const diseaseMatch = text.match(/disease\s*:\s*([^\n]+)/i);
+  const finalScoreMatch = text.match(/final\s+health\s+score\s*:\s*([0-9]+(?:\.[0-9]+)?)(?:\s*\(([^)]+)\))?/i);
+
+  const normalized = text.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const rowRegex = /day\s*(\d+)\s+([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:\.[0-9]+)?)/gi;
+  const rows = [];
+  let match;
+
+  while ((match = rowRegex.exec(normalized)) !== null) {
+    rows.push({
+      day: Number(match[1]),
+      breathScore: Number(match[2]),
+      pauseScore: Number(match[3]),
+      speechRate: Number(match[4]),
+      healthScore: Number(match[5]),
+    });
+  }
+
+  rows.sort((a, b) => a.day - b.day);
+  const firstScore = rows.length ? rows[0].healthScore : null;
+  const lastScore = rows.length ? rows[rows.length - 1].healthScore : null;
+  const scoreDelta = firstScore !== null && lastScore !== null ? lastScore - firstScore : null;
+
+  return {
+    patientName: patientNameMatch ? patientNameMatch[1].trim() : null,
+    disease: diseaseMatch ? diseaseMatch[1].trim() : null,
+    rows,
+    firstScore,
+    lastScore,
+    scoreDelta,
+    finalScore: finalScoreMatch ? Number(finalScoreMatch[1]) : null,
+    finalStatus: finalScoreMatch && finalScoreMatch[2] ? finalScoreMatch[2].trim() : null,
+  };
+}
+
+
+function normalizeStructuredReport(report) {
+  const rows = Array.isArray(report?.rows)
+    ? report.rows
+        .map((row) => ({
+          day: Number(row.day),
+          breathScore: Number(row.breath_score),
+          pauseScore: Number(row.pause_score),
+          speechRate: Number(row.speech_rate),
+          healthScore: Number(row.health_score),
+        }))
+        .filter((row) => Number.isFinite(row.day))
+        .sort((a, b) => a.day - b.day)
+    : [];
+
+  const firstScore = rows.length ? rows[0].healthScore : null;
+  const lastScore = rows.length ? rows[rows.length - 1].healthScore : null;
+  const scoreDelta = firstScore !== null && lastScore !== null ? lastScore - firstScore : null;
+
+  return {
+    patientName: report?.patient_name || null,
+    disease: report?.disease || null,
+    rows,
+    firstScore,
+    lastScore,
+    scoreDelta,
+    finalScore: report?.final_health_score ?? null,
+    finalStatus: report?.final_health_status || null,
+  };
+}
 
 export default function RecordPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [timeLeft, setTimeLeft] = useState(DEFAULT_RECORDING_SECONDS);
   const [error, setError] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isDocumentAnalyzing, setIsDocumentAnalyzing] = useState(false);
   const [sessionId, setSessionId] = useState('VX-....');
   const [selectedDisease, setSelectedDisease] = useState('');
   const [audioUrl, setAudioUrl] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
+  const [documentResult, setDocumentResult] = useState(null);
+  const [mode, setMode] = useState('voice');
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const diseaseOptions = [
     'Asthma',
@@ -29,6 +115,12 @@ export default function RecordPage() {
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const router = useRouter();
+  const structuredDoc = useMemo(() => {
+    if (documentResult?.report) {
+      return normalizeStructuredReport(documentResult.report);
+    }
+    return parseExtractedMedicalReport(documentResult?.extracted_text);
+  }, [documentResult]);
 
   const recordingDuration = selectedDisease === 'Asthma' ? ASTHMA_RECORDING_SECONDS : DEFAULT_RECORDING_SECONDS;
   const elapsedSeconds = Math.max(0, recordingDuration - timeLeft);
@@ -50,6 +142,35 @@ export default function RecordPage() {
       setTimeLeft(recordingDuration);
     }
   }, [recordingDuration, isRecording, isAnalyzing]);
+
+  const processMedicalDocument = async (file) => {
+    setIsDocumentAnalyzing(true);
+    setError('');
+    setDocumentResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('http://localhost:8000/api/extract-medical-records', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const txt = await response.text();
+        throw new Error(`Medical record extraction failed: ${txt}`);
+      }
+
+      const data = await response.json();
+      setDocumentResult(data);
+    } catch (err) {
+      console.error('Document extraction error:', err);
+      setError(err.message || 'Failed to extract medical record.');
+    } finally {
+      setIsDocumentAnalyzing(false);
+    }
+  };
 
   const handleStartRecording = async () => {
     if (isRecording) {
@@ -193,38 +314,42 @@ export default function RecordPage() {
 
   return (
     <>
-      <aside className="hidden md:flex flex-col h-screen w-20 fixed left-0 top-0 border-r border-outline-variant/15 bg-slate-50 items-center py-8 gap-10 z-50">
-        <div className="text-blue-700 font-extrabold text-xl">
-          <span className="material-symbols-outlined text-3xl">waves</span>
+      <aside className="hidden md:flex flex-col h-screen w-64 fixed left-0 top-0 border-r border-outline-variant/15 bg-slate-50 p-4 gap-2 z-50">
+        <div className="flex items-center gap-3 px-2 py-6 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-md">
+            <span className="material-symbols-outlined text-white" style={{ fontVariationSettings: "'FILL' 1" }}>waves</span>
+          </div>
+          <div>
+            <div className="text-blue-700 font-extrabold font-headline text-lg tracking-tight">Vocalis AI</div>
+            <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Clinical Grade</div>
+          </div>
         </div>
-        <nav className="flex flex-col gap-6">
-          <Link href="/">
-            <button className="p-3 text-slate-400 hover:text-blue-600 transition-colors">
-              <span className="material-symbols-outlined">dashboard</span>
-            </button>
+
+        <nav className="flex-1 space-y-1">
+          <Link href="/" className="group flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-100 hover:text-blue-600 rounded-xl font-headline text-sm font-medium transition-all duration-300">
+            <span className="material-symbols-outlined group-hover:scale-110 transition-transform">dashboard</span>
+            <span>Dashboard</span>
           </Link>
-          <button className="p-3 bg-white text-blue-700 rounded-xl shadow-sm border border-outline-variant/10">
+          <Link href="/record" className="group flex items-center gap-3 px-4 py-3 bg-white text-blue-700 rounded-xl shadow-sm border border-outline-variant/10 font-headline text-sm font-medium transition-all duration-300">
             <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>mic</span>
+            <span>Record</span>
+          </Link>
+          <Link href="/history" className="group flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-100 hover:text-blue-600 rounded-xl font-headline text-sm font-medium transition-all duration-300">
+            <span className="material-symbols-outlined group-hover:scale-110 transition-transform">history</span>
+            <span>History</span>
+          </Link>
+          <Link href="/insights" className="group flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-100 hover:text-blue-600 rounded-xl font-headline text-sm font-medium transition-all duration-300">
+            <span className="material-symbols-outlined group-hover:scale-110 transition-transform">analytics</span>
+            <span>Insights</span>
+          </Link>
+          <button className="group w-full flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-100 hover:text-blue-600 rounded-xl font-headline text-sm font-medium transition-all duration-300">
+            <span className="material-symbols-outlined group-hover:scale-110 transition-transform">settings</span>
+            <span>Settings</span>
           </button>
-          <Link href="/history">
-            <button className="p-3 text-slate-400 hover:text-blue-600 transition-colors">
-              <span className="material-symbols-outlined">history</span>
-            </button>
-          </Link>
-          <Link href="/insights">
-            <button className="p-3 text-slate-400 hover:text-blue-600 transition-colors">
-              <span className="material-symbols-outlined">analytics</span>
-            </button>
-          </Link>
         </nav>
-        <div className="mt-auto flex flex-col gap-6">
-          <button className="p-3 text-slate-400 hover:text-blue-600 transition-colors">
-            <span className="material-symbols-outlined">settings</span>
-          </button>
-        </div>
       </aside>
 
-      <main className="md:ml-20 min-h-screen flex flex-col items-center justify-center relative px-6 w-full">
+      <main className="md:ml-64 min-h-screen flex flex-col items-center justify-center relative px-6 w-full">
         <header className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center w-full">
           <div className="flex items-center gap-3">
             <span className="text-on-surface-variant font-headline font-semibold text-sm tracking-tight uppercase">Session ID: {sessionId}</span>
@@ -265,7 +390,8 @@ export default function RecordPage() {
                 ))}
               </select>
             </div>
-            
+
+
             {error && (
                <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-200 mt-4 animate-in fade-in max-w-xl mx-auto shadow-sm">
                   <p className="font-bold mb-2">Recording Error</p>
@@ -339,6 +465,8 @@ export default function RecordPage() {
                 </p>
               </div>
             )}
+
+
           </div>
 
           <div className="relative flex flex-col items-center">

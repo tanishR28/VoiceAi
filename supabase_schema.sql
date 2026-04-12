@@ -120,3 +120,7 @@ CREATE POLICY "Users can update own alerts"
 -- ── Storage Bucket ──
 -- Run this in Supabase Dashboard > Storage
 -- Create a bucket named 'voice-recordings' with public access disabled
+
+-- ── Refresh PostgREST Schema Cache ──
+-- Run after creating or updating tables so Supabase API sees the latest schema immediately.
+NOTIFY pgrst, 'reload schema';

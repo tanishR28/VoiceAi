@@ -63,6 +63,9 @@ venv\Scripts\activate  # Windows
 # Install dependencies
 pip install -r requirements.txt
 
+# Configure environment
+# Copy backend/.env.example to backend/.env and set Supabase values
+
 # Start the server
 uvicorn main:app --reload --port 8000
 ```
@@ -86,7 +89,19 @@ npm run dev
 
 1. Create a new Supabase project at [supabase.com](https://supabase.com)
 2. Go to SQL Editor and run `supabase_schema.sql`
-3. Copy your project URL and anon key to `frontend/.env.local`
+3. If the API still does not see new tables, run this once in SQL Editor:
+
+```sql
+NOTIFY pgrst, 'reload schema';
+```
+
+4. Configure frontend keys in `frontend/.env.local`
+5. Configure backend keys in `backend/.env`:
+
+```bash
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
 
 ### 4. Open the App
 

@@ -1,9 +1,22 @@
-# -----------------------------
-# Python (backend)
-# -----------------------------
+# --------------------------------------------------
+# Global / OS / editor
+# --------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# --------------------------------------------------
+# Python
+# --------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
 # Virtual environments
 .venv/
@@ -11,38 +24,41 @@ venv/
 backend/.venv/
 backend/venv/
 
-# Tool caches
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-
-# Environment files / secrets
-.env
-.env.*
-!.env.example
-
-# -----------------------------
-# Frontend (Next.js)
-# -----------------------------
+# --------------------------------------------------
+# Node / Next.js
+# --------------------------------------------------
+node_modules/
 frontend/node_modules/
+.next/
 frontend/.next/
 frontend/out/
 frontend/.vercel/
 frontend/coverage/
 
-# -----------------------------
-# OS / editor noise
-# -----------------------------
-.DS_Store
-Thumbs.db
-.vscode/
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# -----------------------------
-# Machine Learning Artifacts
-# -----------------------------
-# DONT ignore model artifacts (force track)
-!*.joblib
-!*.pth
-!models/
+# --------------------------------------------------
+# Environment / secrets
+# --------------------------------------------------
+.env
+.env.*
+!.env.example
+!frontend/.env.example
+
+# --------------------------------------------------
+# Temporary runtime artifacts
+# --------------------------------------------------
+backend/temp_*
+backend/test_tone.wav
+
+# --------------------------------------------------
+# ML data and local experiment outputs
+# Keep trained model artifacts under ML/rudra123/models tracked
+# --------------------------------------------------
+ML/rudra123/data/
+ML/rudra123/*dataset*
+ML/rudra123/*.csv

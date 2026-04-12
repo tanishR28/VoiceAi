@@ -1,10 +1,125 @@
 'use client';
+
 import Link from 'next/link';
+import { useMemo } from 'react';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  ScatterChart,
+  Scatter,
+} from 'recharts';
+
+const HARD_CODED_DATA = [
+  { sample: 'S1', pitch_mean: 217.52, pitch_std: 13.106, jitter: 0.00175, shimmer: 0.0512, hnr: 7.723, speech_rate: 3.288, pause_count: 2, avg_pause: 0.2374, status: 'mild_concern' },
+  { sample: 'S2', pitch_mean: 190.73, pitch_std: 14.171, jitter: 0.00226, shimmer: 0.06787, hnr: 10.191, speech_rate: 4.123, pause_count: 4, avg_pause: 0.3629, status: 'mild_concern' },
+  { sample: 'S3', pitch_mean: 159.23, pitch_std: 29.045, jitter: 0.0001, shimmer: 0.04926, hnr: 8.393, speech_rate: 4.302, pause_count: 3, avg_pause: 0.2718, status: 'mild_concern' },
+  { sample: 'S4', pitch_mean: 168.14, pitch_std: 18.704, jitter: 0.00293, shimmer: 0.05969, hnr: 9.77, speech_rate: 3.645, pause_count: 3, avg_pause: 0.3425, status: 'mild_concern' },
+  { sample: 'S5', pitch_mean: 188.42, pitch_std: 17.206, jitter: 0.00284, shimmer: 0.03584, hnr: 13.399, speech_rate: 4.501, pause_count: 3, avg_pause: 0.2219, status: 'mild_concern' },
+  { sample: 'S6', pitch_mean: 188.49, pitch_std: 18.358, jitter: 0.00136, shimmer: 0.02891, hnr: 11.497, speech_rate: 3.327, pause_count: 3, avg_pause: 0.1758, status: 'mild_concern' },
+  { sample: 'S7', pitch_mean: 214.58, pitch_std: 17.051, jitter: 0.00178, shimmer: 0.0501, hnr: 18.216, speech_rate: 4.452, pause_count: 2, avg_pause: 0.3237, status: 'mild_concern' },
+  { sample: 'S8', pitch_mean: 190.8, pitch_std: 9.217, jitter: 0.00204, shimmer: 0.05615, hnr: 12.701, speech_rate: 3.374, pause_count: 3, avg_pause: 0.2992, status: 'mild_concern' },
+  { sample: 'S9', pitch_mean: 194.46, pitch_std: 16.269, jitter: 0.00177, shimmer: 0.04274, hnr: 11.032, speech_rate: 3.96, pause_count: 3, avg_pause: 0.3219, status: 'mild_concern' },
+  { sample: 'S10', pitch_mean: 190.71, pitch_std: 17.434, jitter: 0.00192, shimmer: 0.05481, hnr: 5.937, speech_rate: 3.373, pause_count: 2, avg_pause: 0.3257, status: 'mild_concern' },
+  { sample: 'S11', pitch_mean: 172.91, pitch_std: 20.74, jitter: 0.00166, shimmer: 0.07039, hnr: 10.363, speech_rate: 3.938, pause_count: 2, avg_pause: 0.2854, status: 'mild_concern' },
+  { sample: 'S12', pitch_mean: 159.09, pitch_std: 17.495, jitter: 0.0026, shimmer: 0.04175, hnr: 12.182, speech_rate: 3.299, pause_count: 2, avg_pause: 0.2448, status: 'mild_concern' },
+];
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function avg(values) {
+  if (!values.length) return 0;
+  return values.reduce((s, v) => s + v, 0) / values.length;
+}
 
 export default function InsightsPage() {
+  const chartData = useMemo(() => {
+    return HARD_CODED_DATA.map((row, index, arr) => {
+      const risk =
+        row.jitter * 15000 +
+        row.shimmer * 300 +
+        row.pitch_std * 1.2 +
+        Math.abs(row.speech_rate - 3.8) * 8 +
+        row.pause_count * 3 -
+        row.hnr * 0.8;
+
+      const healthScore = clamp(100 - risk, 35, 95);
+      const start = Math.max(0, index - 2);
+      const movingWindow = arr.slice(start, index + 1).map((item) => {
+        const localRisk =
+          item.jitter * 15000 +
+          item.shimmer * 300 +
+          item.pitch_std * 1.2 +
+          Math.abs(item.speech_rate - 3.8) * 8 +
+          item.pause_count * 3 -
+          item.hnr * 0.8;
+        return clamp(100 - localRisk, 35, 95);
+      });
+
+      return {
+        ...row,
+        health_score: Number(healthScore.toFixed(2)),
+        health_score_avg3: Number(avg(movingWindow).toFixed(2)),
+      };
+    });
+  }, []);
+
+  const biomarkerAverages = useMemo(() => {
+    return [
+      { metric: 'Pitch Mean', avg: Number(avg(chartData.map((d) => d.pitch_mean)).toFixed(2)) },
+      { metric: 'Pitch Std', avg: Number(avg(chartData.map((d) => d.pitch_std)).toFixed(2)) },
+      { metric: 'Jitter', avg: Number(avg(chartData.map((d) => d.jitter)).toFixed(5)) },
+      { metric: 'Shimmer', avg: Number(avg(chartData.map((d) => d.shimmer)).toFixed(5)) },
+      { metric: 'HNR', avg: Number(avg(chartData.map((d) => d.hnr)).toFixed(2)) },
+      { metric: 'Speech', avg: Number(avg(chartData.map((d) => d.speech_rate)).toFixed(2)) },
+      { metric: 'Pause Cnt', avg: Number(avg(chartData.map((d) => d.pause_count)).toFixed(2)) },
+      { metric: 'Avg Pause', avg: Number(avg(chartData.map((d) => d.avg_pause)).toFixed(3)) },
+    ];
+  }, [chartData]);
+
+  const statusPieData = useMemo(() => {
+    let low = 0;
+    let medium = 0;
+    let high = 0;
+
+    chartData.forEach((row) => {
+      if (row.health_score >= 75) low += 1;
+      else if (row.health_score >= 60) medium += 1;
+      else high += 1;
+    });
+
+    return [
+      { name: 'Low Risk', value: low, color: '#10b981' },
+      { name: 'Medium Risk', value: medium, color: '#f59e0b' },
+      { name: 'High Risk', value: high, color: '#ef4444' },
+    ];
+  }, [chartData]);
+
+  const summary = useMemo(() => {
+    return {
+      samples: chartData.length,
+      avgScore: Number(avg(chartData.map((d) => d.health_score)).toFixed(1)),
+      avgJitter: Number(avg(chartData.map((d) => d.jitter)).toFixed(5)),
+      avgShimmer: Number(avg(chartData.map((d) => d.shimmer)).toFixed(5)),
+    };
+  }, [chartData]);
+
   return (
     <>
-      {/* SideNavBar */}
       <aside className="h-screen w-64 fixed left-0 top-0 border-r border-slate-100 bg-slate-50 flex flex-col p-4 gap-2 z-50 hidden md:flex">
         <div className="px-2 py-6 mb-4">
           <div className="flex items-center gap-3">
@@ -17,227 +132,168 @@ export default function InsightsPage() {
             </div>
           </div>
         </div>
+
         <nav className="flex-1 space-y-1">
-          <Link href="/" className="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-100 transition-all active:scale-98 font-headline text-sm font-medium rounded-xl">
+          <Link href="/" className="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-100 rounded-xl font-medium">
             <span className="material-symbols-outlined">dashboard</span>
             <span>Dashboard</span>
           </Link>
-          <Link href="/record" className="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-100 transition-all active:scale-98 font-headline text-sm font-medium rounded-xl">
+          <Link href="/record" className="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-100 rounded-xl font-medium">
             <span className="material-symbols-outlined">mic</span>
             <span>Record</span>
           </Link>
-          <Link href="/history" className="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-100 transition-all active:scale-98 font-headline text-sm font-medium rounded-xl">
+          <Link href="/history" className="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-100 rounded-xl font-medium">
             <span className="material-symbols-outlined">history</span>
             <span>History</span>
           </Link>
-          <Link href="/insights" className="flex items-center gap-3 px-4 py-3 bg-white text-blue-700 rounded-xl shadow-sm transition-all active:scale-98 font-headline text-sm font-medium">
+          <Link href="/insights" className="flex items-center gap-3 px-4 py-3 bg-white text-blue-700 rounded-xl shadow-sm font-semibold">
             <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>analytics</span>
             <span>Insights</span>
           </Link>
-          <button className="flex w-full flex-row items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-100 transition-all active:scale-98 font-headline text-sm font-medium rounded-xl">
-            <span className="material-symbols-outlined">settings</span>
-            <span>Settings</span>
-          </button>
         </nav>
-        <div className="mt-auto border-t border-slate-200/50 pt-4 space-y-1">
-          <Link href="/record">
-            <button className="w-full mb-4 bg-primary text-white py-3 px-4 rounded-2xl font-headline font-semibold text-sm shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 hover:translate-y-[-1px] active:scale-95 transition-all">
-              <span className="material-symbols-outlined text-sm">add</span>
-              New Recording
-            </button>
-          </Link>
-          <button className="w-full flex items-center gap-3 px-4 py-2 text-slate-500 hover:translate-x-1 transition-transform font-headline text-sm font-medium">
-            <span className="material-symbols-outlined text-lg">help</span>
-            <span>Support</span>
-          </button>
-          <button className="w-full flex items-center gap-3 px-4 py-2 text-slate-500 hover:translate-x-1 transition-transform font-headline text-sm font-medium">
-            <span className="material-symbols-outlined text-lg">logout</span>
-            <span>Log out</span>
-          </button>
-        </div>
       </aside>
 
-      {/* Main Canvas */}
-      <main className="md:ml-64 min-h-screen bg-surface mb-16 md:mb-0">
-        <header className="sticky top-0 z-40 bg-white/70 backdrop-blur-xl flex justify-between items-center w-full px-8 py-4 shadow-sm">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold bg-gradient-to-r from-blue-700 to-blue-500 bg-clip-text text-transparent font-headline tracking-tight">Vocalis Health</h2>
-            <div className="h-4 w-[1px] bg-slate-300 mx-2"></div>
-            <div className="flex items-center gap-1 bg-secondary-container/30 px-3 py-1 rounded-full">
-              <span className="material-symbols-outlined text-[14px] text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
-              <span className="text-[11px] font-bold text-secondary uppercase tracking-wider hidden sm:inline">AI Verified Insights</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="hidden lg:flex gap-8">
-              <Link href="/" className="text-slate-500 font-headline text-sm font-semibold hover:text-blue-500 transition-colors">Dashboard</Link>
-              <Link href="/history" className="text-slate-500 font-headline text-sm font-semibold hover:text-blue-500 transition-colors">History</Link>
-              <Link href="/insights" className="text-blue-700 border-b-2 border-blue-600 font-headline text-sm font-semibold">Insights</Link>
-            </div>
-            <div className="flex items-center gap-3">
-              <button className="w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-surface-container rounded-full transition-colors">
-                <span className="material-symbols-outlined">notifications</span>
-              </button>
-              <div className="w-10 h-10 rounded-full bg-surface-container-high overflow-hidden border-2 border-white shadow-sm">
-                <img alt="Clinical Professional Profile" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuADtv5ym5VwJDZc_oCbj8U4PASif7N6DyM-FD7zO_vcFbzTE3WajQIGxE4IKu1b5muiyjWpScalhgau-nRylVFyS1r1OJtVGW9wP2z_YvVRORIwZR89oGVq-c8w41OZhU4juXhul8hGsO-EHTkrkzT8PUvgKCe4PlCtoavI-3xraKf55IsC9U81r36i0yLFEaHfinQYokAdyMwocmJJB88E6snfG3MjcX8HX0r95kCMUpodf4QOAzuPBG_8z4GLmM3Yj4pp0h4Wv3JL" />
-              </div>
-            </div>
-          </div>
+      <main className="flex-1 w-full md:ml-64 min-h-screen p-6 md:p-8 space-y-6">
+        <header>
+          <h2 className="text-3xl font-bold text-slate-900">Clinical Insights Feed</h2>
+          <p className="text-slate-600 mt-1">Clinical feature-set analysis using MFCC and biomarker patterns.</p>
         </header>
 
-        <div className="max-w-6xl mx-auto p-6 md:p-8 lg:p-12">
-          {/* Header Section */}
-          <div className="mb-12 flex flex-col md:flex-row md:justify-between md:items-end gap-6">
-            <div className="max-w-2xl">
-              <span className="text-primary font-bold text-sm tracking-widest uppercase mb-2 block">Voice Analysis Engine</span>
-              <h1 className="text-4xl font-extrabold font-headline text-on-surface tracking-tight mb-4">Clinical Insights Feed</h1>
-              <p className="text-on-surface-variant text-lg leading-relaxed">Continuous monitoring of vocal biomarkers to detect subtle physiological changes before they become symptomatic.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button className="bg-surface-container-lowest px-4 py-2.5 rounded-xl text-sm font-semibold text-on-surface-variant shadow-sm border border-outline-variant/10 flex items-center gap-2 hover:bg-white transition-all">
-                <span className="material-symbols-outlined text-sm">filter_list</span>
-                Filter
-              </button>
-              <button className="bg-primary text-white px-6 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-primary/20 flex items-center gap-2 hover:translate-y-[-1px] transition-all">
-                <span className="material-symbols-outlined text-sm">ios_share</span>
-                Export Report
-              </button>
+        <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4">
+            <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Samples</p>
+            <p className="text-3xl font-extrabold text-slate-900 mt-1">{summary.samples}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-4">
+            <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Avg Health Score</p>
+            <p className="text-3xl font-extrabold text-slate-900 mt-1">{summary.avgScore}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-4">
+            <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Avg Jitter</p>
+            <p className="text-3xl font-extrabold text-slate-900 mt-1">{summary.avgJitter}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-4">
+            <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Avg Shimmer</p>
+            <p className="text-3xl font-extrabold text-slate-900 mt-1">{summary.avgShimmer}</p>
+          </div>
+        </section>
+
+        <section className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          <div className="xl:col-span-8 bg-white rounded-2xl border border-slate-200 p-5">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Health Score Trend (Raw vs Avg-3)</h3>
+            <div style={{ height: 320 }}>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="sample" tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <YAxis domain={[30, 100]} tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="health_score" stroke="#2563eb" strokeWidth={3} dot={false} name="Health Score" />
+                  <Line type="monotone" dataKey="health_score_avg3" stroke="#16a34a" strokeWidth={3} dot={false} name="Avg-3" />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            {/* Critical Alert Card */}
-            <div className="md:col-span-8 bg-surface-container-lowest rounded-3xl p-6 sm:p-8 shadow-sm border-l-4 border-error/40 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-8 hidden sm:block">
-                <div className="w-12 h-12 bg-error-container/30 rounded-2xl flex items-center justify-center text-error">
-                  <span className="material-symbols-outlined text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>
-                </div>
-              </div>
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-6">
-                  <span className="px-3 py-1 rounded-full bg-error/10 text-error text-[10px] font-bold uppercase tracking-widest">Urgent Alert</span>
-                  <span className="text-on-surface-variant text-xs font-medium">4 hours ago</span>
-                </div>
-                <h3 className="text-2xl font-bold font-headline mb-4 text-on-surface">Mild anomaly detected in voice tremor</h3>
-                <p className="text-on-surface-variant text-lg leading-relaxed mb-8 max-w-xl">
-                  Our neural network has identified a persistent micro-tremor in your vocal range. The trend suggests a <span className="font-bold text-error">12% increase</span> in variability over the past 48 hours compared to your personal baseline.
-                </p>
-                <div className="bg-surface-container-low rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-6 border border-outline-variant/5">
-                  <div className="flex-1 w-full flex-col">
-                    <p className="text-sm font-medium text-on-surface-variant mb-1 uppercase tracking-tight">Clinical Suggestion</p>
-                    <p className="text-on-surface text-sm">Consider consulting your doctor if trend continues. This data can be directly exported for clinical review.</p>
-                  </div>
-                  <div className="flex gap-3 w-full sm:w-auto mt-4 sm:mt-0 items-center justify-end">
-                    <button className="flex-1 md:flex-none bg-white text-on-surface px-5 py-3 rounded-xl text-sm font-bold shadow-sm border border-outline-variant/20 hover:bg-slate-50 transition-all">Dismiss</button>
-                    <button className="flex-1 md:flex-none bg-primary text-white px-5 py-3 rounded-xl text-sm font-bold shadow-md hover:bg-primary-container transition-all">Export</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Snapshot Data Metric */}
-            <div className="md:col-span-4 bg-primary text-white rounded-3xl p-8 relative overflow-hidden">
-              <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-white/10 rounded-full blur-3xl"></div>
-              <span className="text-white/70 text-xs font-bold uppercase tracking-widest block mb-1">Stability Index</span>
-              <div className="flex items-baseline gap-2 mb-8">
-                <span className="text-6xl font-extrabold font-headline">88</span>
-                <span className="text-xl font-medium text-white/80">/100</span>
-              </div>
-              <div className="space-y-4 relative z-10">
-                <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-                  <div className="h-full bg-white rounded-full shadow-[0_0_12px_rgba(255,255,255,0.5)]" style={{ width: '88%' }}></div>
-                </div>
-                <p className="text-sm text-white/80 leading-snug font-medium">Your stability index is slightly lower than your 7-day average (92). Correlation with current tremor alert detected.</p>
-              </div>
-            </div>
-
-            {/* Success Card */}
-            <div className="md:col-span-5 bg-surface-container-lowest rounded-3xl p-8 shadow-sm border-t border-secondary-container group">
-              <div className="flex items-center justify-between mb-6">
-                <div className="w-10 h-10 bg-secondary/10 rounded-xl flex items-center justify-center text-secondary">
-                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                </div>
-                <span className="text-on-surface-variant text-xs font-medium">2 days ago</span>
-              </div>
-              <h3 className="text-xl font-bold font-headline mb-3 text-on-surface">Baseline Restored</h3>
-              <p className="text-on-surface-variant leading-relaxed">Breath stability has returned to baseline levels. Your recent samples show consistent respiratory-vocal coordination.</p>
-            </div>
-
-            {/* Secondary Insight */}
-            <div className="md:col-span-7 bg-surface-container-low rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row gap-8 items-center border border-outline-variant/10">
-              <div className="w-full md:w-48 h-32 rounded-2xl bg-white p-4 flex flex-col justify-between shadow-inner">
-                <div className="flex items-end gap-1 h-12">
-                  <div className="w-full bg-primary/20 rounded-t-sm h-[40%]"></div>
-                  <div className="w-full bg-primary/20 rounded-t-sm h-[60%]"></div>
-                  <div className="w-full bg-primary/20 rounded-t-sm h-[55%]"></div>
-                  <div className="w-full bg-primary/40 rounded-t-sm h-[80%]"></div>
-                  <div className="w-full bg-primary/30 rounded-t-sm h-[70%]"></div>
-                  <div className="w-full bg-primary rounded-t-sm h-[100%] shadow-lg"></div>
-                </div>
-                <p className="text-[10px] text-center font-bold text-on-surface-variant">PEAK VOLUME VARIANCE</p>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed-variant text-[10px] font-bold uppercase tracking-widest">Tip</span>
-                </div>
-                <h4 className="text-lg font-bold font-headline mb-2">Afternoon Fatigue Detected</h4>
-                <p className="text-sm text-on-surface-variant leading-relaxed italic">"Vocal clarity typically drops by 4% between 3 PM and 5 PM. Consider scheduling important recordings during morning hours for peak clinical accuracy."</p>
-              </div>
-            </div>
-
-            {/* Knowledge Base Integration */}
-            <div className="md:col-span-12 bg-white rounded-3xl p-1 shadow-sm mt-4 border border-outline-variant/5">
-              <div className="flex flex-col lg:flex-row">
-                <div className="lg:w-1/3 h-64 lg:h-auto relative overflow-hidden rounded-2xl m-2">
-                  <img alt="Medical professional using tablet" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCVWzRSvNUP4F0Cp29sfUD9KdRf821JFW2V3ijhAWsVPC_opTFt3rJS4RF323lTFDrAad1GjHJdpk-3hCUJljdgzRXz--vh__rD5dsft6CfqaNj76Dm6tce0NAUX2tj3KOiYznbpZFJv26WrbWb3_JZbjeuNYgnsMBAHG5xeTnTG-_7dM-NTF2Y4VVEL9KEAaMzKNH7K6drkspNMuV6mQf0jnDVOmzodDmq5wiCYt0d1lGXT-5C-fI-TALpaU1FdqYoRSSIJGpdKxq1" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-primary/60 to-transparent"></div>
-                  <div className="absolute bottom-6 left-6 text-white">
-                    <p className="text-xs font-bold uppercase tracking-widest mb-1 opacity-80">Resource</p>
-                    <p className="text-xl font-bold font-headline">Understanding Biomarkers</p>
-                  </div>
-                </div>
-                <div className="lg:w-2/3 p-6 sm:p-8 flex flex-col justify-center">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[14px]">school</span>
-                      Clinician Reviewed
-                    </div>
-                  </div>
-                  <h3 className="text-2xl font-bold font-headline mb-4">The Science of Vocal Diagnostics</h3>
-                  <p className="text-on-surface-variant leading-relaxed mb-6">Learn how subtle changes in pitch jitter and shimmer can provide early indicators for neurological and respiratory health monitoring. Our engine analyzes over 400 acoustic parameters per second.</p>
-                  <button className="text-primary font-bold flex items-center gap-2 hover:translate-x-1 transition-transform">
-                    Read Clinical Whitepaper
-                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                  </button>
-                </div>
-              </div>
+          <div className="xl:col-span-4 bg-white rounded-2xl border border-slate-200 p-5">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Risk Distribution</h3>
+            <div style={{ height: 320 }}>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie data={statusPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label>
+                    {statusPieData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
           </div>
-        </div>
 
-        {/* Mobile Nav */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 glass-card border-t border-slate-100 flex justify-around items-center py-4 px-6 z-50 bg-white/80">
-          <Link href="/" className="flex flex-col items-center gap-1 text-slate-500">
-            <span className="material-symbols-outlined">dashboard</span>
-            <span className="text-[10px] font-bold">Dashboard</span>
-          </Link>
-          <Link href="/record" className="flex flex-col items-center gap-1 text-slate-500">
-            <span className="material-symbols-outlined">mic</span>
-            <span className="text-[10px] font-bold">Record</span>
-          </Link>
-          <Link href="/history" className="flex flex-col items-center gap-1 text-slate-500">
-            <span className="material-symbols-outlined">history</span>
-            <span className="text-[10px] font-bold">History</span>
-          </Link>
-          <Link href="/insights" className="flex flex-col items-center gap-1 text-blue-700">
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>analytics</span>
-            <span className="text-[10px] font-bold">Insights</span>
-          </Link>
-          <Link href="/" className="flex flex-col items-center gap-1 text-slate-500">
-            <span className="material-symbols-outlined">settings</span>
-            <span className="text-[10px] font-bold">Settings</span>
-          </Link>
-        </nav>
+          <div className="xl:col-span-6 bg-white rounded-2xl border border-slate-200 p-5">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Pitch Profile</h3>
+            <div style={{ height: 320 }}>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="sample" tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <YAxis tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="pitch_mean" stroke="#0ea5e9" strokeWidth={3} dot={false} name="Pitch Mean" />
+                  <Line type="monotone" dataKey="pitch_std" stroke="#f97316" strokeWidth={3} dot={false} name="Pitch Std" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="xl:col-span-6 bg-white rounded-2xl border border-slate-200 p-5">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Jitter and Shimmer</h3>
+            <div style={{ height: 320 }}>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="sample" tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <YAxis tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <Tooltip />
+                  <Legend />
+                  <Area type="monotone" dataKey="jitter" stroke="#ef4444" fill="#fecaca" name="Jitter" />
+                  <Area type="monotone" dataKey="shimmer" stroke="#a855f7" fill="#e9d5ff" name="Shimmer" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="xl:col-span-7 bg-white rounded-2xl border border-slate-200 p-5">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Speech and Pause Dynamics</h3>
+            <div style={{ height: 320 }}>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="sample" tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <YAxis tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="speech_rate" fill="#22c55e" name="Speech Rate" radius={[5, 5, 0, 0]} />
+                  <Bar dataKey="pause_count" fill="#f59e0b" name="Pause Count" radius={[5, 5, 0, 0]} />
+                  <Bar dataKey="avg_pause" fill="#64748b" name="Avg Pause" radius={[5, 5, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="xl:col-span-5 bg-white rounded-2xl border border-slate-200 p-5">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">HNR vs Health Score</h3>
+            <div style={{ height: 320 }}>
+              <ResponsiveContainer width="100%" height={300}>
+                <ScatterChart margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis type="number" dataKey="hnr" name="HNR" tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <YAxis type="number" dataKey="health_score" name="Health Score" tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                  <Scatter data={chartData} fill="#2563eb" />
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="xl:col-span-12 bg-white rounded-2xl border border-slate-200 p-5">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Biomarker Averages</h3>
+            <div style={{ height: 320 }}>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={biomarkerAverages} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="metric" tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <YAxis tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <Tooltip />
+                  <Bar dataKey="avg" fill="#0ea5e9" name="Average Value" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </section>
       </main>
     </>
   );
