@@ -1,0 +1,22 @@
+# Data and Large Files
+data/
+*.csv
+*dataset*
+
+# Audio and Temp
+*.wav
+*.mp3
+*.ogg
+temp_*
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Environments
+venv/
+.env
+
+# Streamlit
+.streamlit/

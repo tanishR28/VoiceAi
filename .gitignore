@@ -1,0 +1,48 @@
+# -----------------------------
+# Python (backend)
+# -----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+backend/.venv/
+backend/venv/
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environment files / secrets
+.env
+.env.*
+!.env.example
+
+# -----------------------------
+# Frontend (Next.js)
+# -----------------------------
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.vercel/
+frontend/coverage/
+
+# -----------------------------
+# OS / editor noise
+# -----------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+
+# -----------------------------
+# Machine Learning Artifacts
+# -----------------------------
+# DONT ignore model artifacts (force track)
+!*.joblib
+!*.pth
+!models/
