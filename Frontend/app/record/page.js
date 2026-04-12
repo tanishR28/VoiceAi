@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 
 const DEFAULT_RECORDING_SECONDS = 15;
 const ASTHMA_RECORDING_SECONDS = 20;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 function parseExtractedMedicalReport(rawText) {
   const text = String(rawText || '');
@@ -152,7 +153,7 @@ export default function RecordPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('http://localhost:8000/api/extract-medical-records', {
+      const response = await fetch(`${API_URL}/api/extract-medical-records`, {
         method: 'POST',
         body: formData,
       });
@@ -285,7 +286,7 @@ export default function RecordPage() {
       formData.append('file', wavBlob, 'recording.wav');
       formData.append('disease', selectedDisease);
 
-      const response = await fetch('http://localhost:8000/api/analyze', {
+      const response = await fetch(`${API_URL}/api/analyze`, {
         method: 'POST',
         body: formData,
       });
